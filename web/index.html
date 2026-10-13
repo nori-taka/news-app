@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f3a5f">
+<title>ニュース収集</title>
+<style>
+:root {
+  --bg: #f5f6f8; --card: #ffffff; --text: #1c2330; --sub: #6a7385;
+  --line: #e3e6ec; --accent: #1f5fbf; --chip: #e8ecf3; --chip-on: #1f5fbf; --chip-on-text: #fff;
+  --warn: #b25b00; --star: #d98a00; --danger: #c0392b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12161d; --card: #1b212b; --text: #e6e9ef; --sub: #98a1b3;
+    --line: #2a3240; --accent: #6aa3ff; --chip: #262e3b; --chip-on: #6aa3ff; --chip-on-text: #0d1117;
+    --warn: #e0a050; --star: #f0b040; --danger: #ef7d70;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif; }
+header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line);
+  padding: 10px max(16px, calc((100% - 760px) / 2 + 16px)) 8px; }
+.top { display: flex; align-items: center; gap: 10px; }
+h1 { font-size: 17px; margin: 0; flex: 1; }
+button { font: inherit; border: 0; border-radius: 8px; padding: 7px 14px; cursor: pointer;
+  background: var(--accent); color: var(--chip-on-text); }
+button.ghost { background: var(--chip); color: var(--text); }
+button.danger { background: transparent; color: var(--danger); padding-left: 6px; padding-right: 6px; }
+button:disabled { opacity: .5; cursor: default; }
+.meta { color: var(--sub); font-size: 12px; margin-top: 2px; }
+input[type=search], input[type=email], textarea { width: 100%; padding: 8px 12px; font: inherit; color: var(--text);
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+input[type=search] { margin-top: 8px; }
+textarea { min-height: 84px; resize: vertical; }
+.tabs { display: flex; gap: 4px; margin-top: 8px; }
+.tab { flex: 1; text-align: center; padding: 6px 0; border-radius: 8px; background: var(--chip); cursor: pointer; font-size: 14px; }
+.tab.on { background: var(--chip-on); color: var(--chip-on-text); font-weight: 600; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 2px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; background: var(--chip); color: var(--text); padding: 5px 12px; border-radius: 999px; font-size: 13px; cursor: pointer; }
+.chip.on { background: var(--chip-on); color: var(--chip-on-text); }
+.chips.sub .chip { font-size: 12px; padding: 3px 10px; }
+main { padding: 8px 16px 40px; max-width: 760px; margin: 0 auto; }
+.day { color: var(--sub); font-size: 12px; margin: 14px 0 6px; }
+.item { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; margin-bottom: 8px; }
+.item.saved { border-left: 3px solid var(--star); }
+.title { font-weight: 600; color: inherit; text-decoration: none; display: block; }
+.info { margin-top: 4px; font-size: 12px; color: var(--sub); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.src { color: var(--accent); }
+.spacer { flex: 1; }
+.star { background: transparent; color: var(--sub); padding: 2px 8px; font-size: 13px; border: 1px solid var(--line); }
+.star.on { color: var(--star); border-color: var(--star); }
+.comment { margin-top: 8px; padding: 8px 10px; background: var(--bg); border-radius: 8px; white-space: pre-wrap; font-size: 14px; }
+.editor { margin-top: 8px; }
+.editor .row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.notice { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  margin: 10px 0; font-size: 13px; color: var(--warn); }
+.empty { text-align: center; color: var(--sub); padding: 40px 0; }
+.login { max-width: 420px; margin: 40px auto; text-align: center; }
+.login p { color: var(--sub); }
+.login button { margin-top: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>ニュース収集</h1>
+    <button id="refresh">更新</button>
+  </div>
+  <div class="meta" id="meta">読み込み中…</div>
+  <div class="tabs">
+    <div class="tab on" id="tab-new">新着</div>
+    <div class="tab" id="tab-saved">保存済み <span id="saved-count"></span></div>
+  </div>
+  <input type="search" id="q" placeholder="タイトルで絞り込み">
+  <div class="chips" id="groups"></div>
+  <div class="chips sub" id="sources"></div>
+</header>
+<main>
+  <div id="notice"></div>
+  <div id="list"></div>
+</main>
+
+<script src="config.js"></script>
+<script src="store.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let data = null;
+let saved = new Map();   // 記事ID -> 保存データ
+let editingId = null;    // コメント入力中の記事ID
+const state = { tab: "new", group: "all", source: "all", q: "" };
+
+function showNotice(msg) { $("notice").innerHTML = msg ? `<div class="notice"></div>` : ""; if (msg) $("notice").firstChild.textContent = msg; }
+
+async function load() {
+  const r = await fetch("data/feeds.json", { cache: "no-store" });
+  data = await r.json();
+  render();
+}
+
+async function loadSaved() {
+  saved = new Map((await store.list()).map((s) => [s.id, s]));
+}
+
+// http/https や ?ref=rss など追跡用パラメータの違いは同じ記事とみなす（記事IDを持つクエリは残す）
+function dedupeKey(link) {
+  try {
+    const u = new URL(link);
+    for (const k of [...u.searchParams.keys()]) {
+      if (/^(ref|iref|from|rss|utm_.*)$/i.test(k)) u.searchParams.delete(k);
+    }
+    u.hash = "";
+    return u.host + u.pathname + u.search;
+  } catch { return link; }
+}
+const idCache = new Map();
+async function articleId(link) {
+  const key = dedupeKey(link);
+  if (!idCache.has(key)) {
+    const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(key));
+    idCache.set(key, [...new Uint8Array(buf)].slice(0, 8).map((b) => b.toString(16).padStart(2, "0")).join(""));
+  }
+  return idCache.get(key);
+}
+
+function ago(iso) {
+  if (!iso) return "";
+  const m = Math.floor((Date.now() - new Date(iso)) / 60000);
+  if (m < 1) return "たった今";
+  if (m < 60) return `${m}分前`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)}時間前`;
+  return `${Math.floor(m / 1440)}日前`;
+}
+function dayLabel(iso) {
+  if (!iso) return "日時なし";
+  return new Date(iso).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: "short" });
+}
+function hhmm(iso) {
+  return iso ? new Date(iso).toLocaleTimeString("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }) : "";
+}
+
+function chips(el, items, key) {
+  el.innerHTML = "";
+  for (const [id, name] of items) {
+    const b = document.createElement("span");
+    b.className = "chip" + (state[key] === id ? " on" : "");
+    b.textContent = name;
+    b.onclick = () => {
+      state[key] = id;
+      if (key === "group") state.source = "all";
+      render();
+    };
+    el.appendChild(b);
+  }
+}
+
+// 1件分のカード。a は {id, title, link, source(媒体名), published, comment?}
+function card(a, { showEditorFor }) {
+  const el = document.createElement("div");
+  const isSaved = saved.has(a.id);
+  el.className = "item" + (isSaved ? " saved" : "");
+  el.innerHTML = `<a class="title" target="_blank" rel="noopener"></a>
+    <div class="info"><span class="src"></span><span class="time"></span><span class="spacer"></span><button class="star"></button></div>`;
+  const t = el.querySelector(".title");
+  t.textContent = a.title; t.href = a.link;
+  el.querySelector(".src").textContent = a.source;
+  el.querySelector(".time").textContent = [hhmm(a.published), ago(a.published)].filter(Boolean).join("・");
+  const star = el.querySelector(".star");
+  star.textContent = isSaved ? "★ 保存済み" : "☆ 保存";
+  star.className = "star" + (isSaved ? " on" : "");
+  star.onclick = () => { editingId = editingId === a.id ? null : a.id; render(); };
+
+  const cur = saved.get(a.id);
+  if (cur && cur.comment && editingId !== a.id) {
+    const c = document.createElement("div");
+    c.className = "comment"; c.textContent = cur.comment; el.appendChild(c);
+  }
+  if (editingId === a.id) {
+    const ed = document.createElement("div");
+    ed.className = "editor";
+    ed.innerHTML = `<textarea placeholder="感想・メモ（なぜ気になった？ 何を思った？）"></textarea>
+      <div class="row"><button class="do-save">保存</button><button class="ghost do-cancel">閉じる</button><span class="spacer"></span></div>`;
+    const ta = ed.querySelector("textarea");
+    ta.value = cur ? cur.comment : "";
+    ed.querySelector(".do-cancel").onclick = () => { editingId = null; render(); };
+    ed.querySelector(".do-save").onclick = async (ev) => {
+      ev.target.disabled = true;
+      try {
+        await store.save({ id: a.id, title: a.title, link: a.link, source: a.source, published: a.published,
+          comment: ta.value.trim(), saved_at: cur && cur.saved_at });
+        await loadSaved(); editingId = null; showNotice(""); render();
+      } catch (e) { showNotice("保存できませんでした: " + e.message); ev.target.disabled = false; }
+    };
+    if (cur) {
+      const del = document.createElement("button");
+      del.className = "danger"; del.textContent = "保存を取り消す";
+      del.onclick = async () => {
+        if (!confirm("この記事の保存とコメントを削除します。よろしいですか？")) return;
+        try { await store.remove(a.id); await loadSaved(); editingId = null; render(); }
+        catch (e) { showNotice("削除できませんでした: " + e.message); }
+      };
+      ed.querySelector(".row").appendChild(del);
+    }
+    el.appendChild(ed);
+    setTimeout(() => ta.focus(), 0);
+  }
+  return el;
+}
+
+let renderToken = 0;
+async function render() {
+  const token = ++renderToken;
+  $("saved-count").textContent = saved.size ? `(${saved.size})` : "";
+  $("tab-new").className = "tab" + (state.tab === "new" ? " on" : "");
+  $("tab-saved").className = "tab" + (state.tab === "saved" ? " on" : "");
+  $("q").placeholder = state.tab === "new" ? "タイトルで絞り込み" : "タイトル・コメントで検索";
+  const isNew = state.tab === "new";
+  $("groups").style.display = isNew ? "flex" : "none";
+
+  const list = $("list");
+  list.innerHTML = "";
+  const q = state.q.trim().toLowerCase();
+
+  if (!isNew) {
+    $("sources").style.display = "none";
+    const rows = [...saved.values()].filter((s) => !q || (s.title + " " + (s.comment || "")).toLowerCase().includes(q));
+    if (!rows.length) { list.innerHTML = `<div class="empty">${saved.size ? "該当する保存記事がありません" : "まだ保存した記事がありません。新着で「☆ 保存」を押してください"}</div>`; return; }
+    let lastDay = null;
+    for (const s of rows) {
+      const day = "保存 " + dayLabel(s.saved_at);
+      if (day !== lastDay) { const h = document.createElement("div"); h.className = "day"; h.textContent = day; list.appendChild(h); lastDay = day; }
+      list.appendChild(card(s, {}));
+    }
+    return;
+  }
+
+  const srcById = Object.fromEntries(data.sources.map((s) => [s.id, s]));
+  $("meta").textContent = `最終取得 ${new Date(data.fetched_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}（${ago(data.fetched_at)}）`;
+
+  chips($("groups"), [["all", "すべて"], ...data.groups.map((g) => [g.id, g.name])], "group");
+  const subs = data.sources.filter((s) => state.group === "all" || s.group === state.group);
+  chips($("sources"), state.group === "all" ? [] : [["all", "全部"], ...subs.map((s) => [s.id, s.name])], "source");
+  $("sources").style.display = state.group === "all" ? "none" : "flex";
+
+  const failed = data.status.filter((s) => !s.ok).map((s) => srcById[s.id].name);
+  if (failed.length) showNotice("取得できなかった媒体: " + failed.join("、"));
+
+  const seen = new Set();  // 朝日の総合と政治など、同じ記事は絞り込みの範囲内で1件にまとめる
+  const rows = data.articles.filter((a) => {
+    const s = srcById[a.source];
+    const hit = (state.group === "all" || s.group === state.group)
+      && (state.source === "all" || a.source === state.source)
+      && (!q || a.title.toLowerCase().includes(q));
+    const key = dedupeKey(a.link);
+    if (!hit || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!rows.length) { list.innerHTML = '<div class="empty">該当する記事がありません</div>'; return; }
+
+  const ids = await Promise.all(rows.map((a) => articleId(a.link)));
+  if (token !== renderToken) return;  // 待っている間に次の描画が始まっていたら、古い方は捨てる
+  list.innerHTML = "";
+  let lastDay = null;
+  rows.forEach((a, i) => {
+    const day = dayLabel(a.published);
+    if (day !== lastDay) { const h = document.createElement("div"); h.className = "day"; h.textContent = day; list.appendChild(h); lastDay = day; }
+    list.appendChild(card({ id: ids[i], title: a.title, link: a.link,
+      source: srcById[a.source].name, published: a.published }, {}));
+  });
+}
+
+$("q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
+$("tab-new").onclick = () => { state.tab = "new"; render(); };
+$("tab-saved").onclick = () => { state.tab = "saved"; render(); };
+
+$("refresh").onclick = async () => {
+  const b = $("refresh");
+  b.disabled = true; b.textContent = "取得中…";
+  try {
+    const r = await fetch("/api/refresh", { method: "POST" });
+    // 手元PC版はその場で取得。クラウド版（配信先に /api/refresh が無い）は、自動巡回済みの最新を読み込み直す
+    if (!r.ok && ![404, 405, 501].includes(r.status)) throw new Error(await r.text());
+    await load();
+  } catch (e) {
+    showNotice("更新に失敗しました: " + String(e.message).slice(0, 200));
+  } finally {
+    b.disabled = false; b.textContent = "更新";
+  }
+};
+
+function showLogin() {
+  $("list").innerHTML = `<div class="login"><h2>ログイン</h2>
+    <p>登録したメールアドレスにログイン用のリンクを送ります。</p>
+    <input type="email" id="email" placeholder="メールアドレス" autocomplete="email">
+    <button id="send-link">ログインリンクを送る</button><p id="login-msg"></p></div>`;
+  $("send-link").onclick = async () => {
+    try { await store.sendLoginLink($("email").value.trim()); $("login-msg").textContent = "送りました。メールのリンクを開いてください。"; }
+    catch (e) { $("login-msg").textContent = "送れませんでした: " + e.message; }
+  };
+}
+
+(async () => {
+  try {
+    const st = await store.init();
+    if (st.needLogin) { $("meta").textContent = ""; showLogin(); return; }
+    if (store.mode === "cloud") {
+      const out = document.createElement("button");
+      out.className = "ghost"; out.textContent = "ログアウト"; out.onclick = () => store.logout();
+      document.querySelector(".top").appendChild(out);
+    }
+    await Promise.all([load(), loadSaved()]);
+    render();
+  } catch (e) {
+    $("meta").textContent = "読み込めませんでした: " + e.message + "（python fetch_feeds.py を実行してください）";
+  }
+})();
+</script>
+</body>
+</html>

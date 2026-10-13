@@ -1,0 +1,33 @@
+{
+  "groups": [
+    { "id": "press", "name": "新聞・通信" },
+    { "id": "portal", "name": "放送・ポータル" },
+    { "id": "gov", "name": "政府・日銀" },
+    { "id": "opinion", "name": "解説・論壇" }
+  ],
+  "sources": [
+    { "id": "asahi", "name": "朝日 総合", "group": "press", "url": "https://www.asahi.com/rss/asahi/newsheadlines.rdf" },
+    { "id": "asahi-politics", "name": "朝日 政治", "group": "press", "url": "https://www.asahi.com/rss/asahi/politics.rdf" },
+    { "id": "asahi-business", "name": "朝日 経済", "group": "press", "url": "https://www.asahi.com/rss/asahi/business.rdf" },
+    { "id": "mainichi", "name": "毎日 速報", "group": "press", "url": "https://mainichi.jp/rss/etc/mainichi-flash.rss" },
+    { "id": "yomiuri", "name": "読売 新着", "group": "press", "url": "https://assets.wor.jp/rss/rdf/yomiuri/latestnews.rdf", "unofficial": true },
+    { "id": "sankei", "name": "産経 速報", "group": "press", "url": "https://assets.wor.jp/rss/rdf/sankei/flash.rdf", "unofficial": true },
+    { "id": "nikkei", "name": "日経 速報", "group": "press", "url": "https://assets.wor.jp/rss/rdf/nikkei/news.rdf", "unofficial": true },
+    { "id": "jiji", "name": "時事 ランキング", "group": "press", "url": "https://www.jiji.com/rss/ranking.rdf" },
+
+    { "id": "nhk", "name": "NHK 主要", "group": "portal", "url": "https://www.nhk.or.jp/rss/news/cat0.xml" },
+    { "id": "nhk-politics", "name": "NHK 政治", "group": "portal", "url": "https://www3.nhk.or.jp/rss/news/cat4.xml" },
+    { "id": "yahoo", "name": "Yahoo! 主要", "group": "portal", "url": "https://news.yahoo.co.jp/rss/topics/top-picks.xml" },
+
+    { "id": "cao", "name": "内閣府", "group": "gov", "url": "https://www.cao.go.jp/rss/news.rdf" },
+    { "id": "kantei", "name": "首相官邸", "group": "gov", "url": "https://www.kantei.go.jp/index-jnews.rdf" },
+    { "id": "mof", "name": "財務省", "group": "gov", "url": "https://www.mof.go.jp/news.rss" },
+    { "id": "boj", "name": "日本銀行", "group": "gov", "url": "https://www.boj.or.jp/rss/whatsnew.xml" },
+
+    { "id": "toyokeizai", "name": "東洋経済", "group": "opinion", "url": "https://toyokeizai.net/list/feed/rss" },
+    { "id": "president", "name": "PRESIDENT", "group": "opinion", "url": "https://president.jp/list/rss" },
+    { "id": "gendai", "name": "現代ビジネス", "group": "opinion", "url": "https://gendai.media/list/feed/rss" },
+    { "id": "hatena", "name": "はてブ 人気", "group": "opinion", "url": "https://b.hatena.ne.jp/hotentry/general.rss" },
+    { "id": "japantimes", "name": "Japan Times", "group": "opinion", "url": "https://www.japantimes.co.jp/feed/" }
+  ]
+}
