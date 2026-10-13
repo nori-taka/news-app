@@ -9,6 +9,13 @@
 - 保存するのはタイトル・リンク・媒体・日時・自分のコメントのみ（記事本文は保存しない）
 - 読売・産経・日経は外部サイト（wor.jp）経由＝非公式。止まることがある
 
+## 公開先（スマホ・PC共通）
+- 画面: https://nori-taka.github.io/news-app/ （GitHub Pages）
+- リポジトリ: https://github.com/nori-taka/news-app （公開。コードと媒体一覧のみ。保存記事・コメントは含まれない）
+- 自動巡回: `.github/workflows/deploy.yml` が30分ごとに各社を巡回して画面ごと公開（手動実行も可）
+- 更新の反映: `git push`（この `projects/news-app/` フォルダが独立したgitリポジトリ）。pushすると自動で再公開される
+- ログインのリダイレクト先: Supabase の Authentication → URL Configuration に `https://nori-taka.github.io/news-app/**` を登録済みであること
+
 ## 保存先（`web/config.js` で切り替え）
 | モード | 条件 | 保存先 |
 |---|---|---|
