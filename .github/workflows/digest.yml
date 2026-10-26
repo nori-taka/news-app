@@ -1,0 +1,30 @@
+name: 朝夕のニュースメール
+
+# 新聞・通信の新着を、朝 7:35 と夕方 16:35（日本時間）にメールで送る。
+# 毎時0分は GitHub の定時実行が混んで遅れるので、35分にずらしている。
+# 手動実行（Actionsタブの「Run workflow」）でも送れる。
+on:
+  schedule:
+    - cron: "35 22 * * *"  # 日本時間 7:35
+    - cron: "35 7 * * *"   # 日本時間 16:35
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 各社のRSSを取得
+        run: python fetch_feeds.py
+      - name: メールを送る
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python send_digest.py
