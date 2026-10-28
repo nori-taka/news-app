@@ -47,9 +47,14 @@ def norm_link(link):
 
 
 def build(feeds, now):
-    morning = now.hour < 12
-    # 朝は前日夕方のメール以降（約15時間）、夕方は朝のメール以降（約9時間）。少し余裕を持たせる
-    since = now - timedelta(hours=16 if morning else 10)
+    # 朝7時／昼12時／夕18時ごろに届く。前回のメール以降（13・5・6時間）に少し余裕を持たせる
+    if now.hour < 10:
+        label, hours = "朝刊", 15
+    elif now.hour < 15:
+        label, hours = "昼刊", 7
+    else:
+        label, hours = "夕刊", 8
+    since = now - timedelta(hours=hours)
 
     by_company = {name: {} for _, name in COMPANIES}  # name -> {link: (dt, title)}
     for a in feeds["articles"]:
@@ -85,7 +90,7 @@ def build(feeds, now):
         lines.append("")
     lines.append("※ 取得できなかった媒体: " + ("、".join(failed) if failed else "なし"))
 
-    subject = f"ニュース{'朝刊' if morning else '夕刊'} {now:%m/%d %H:%M}（新着{total}件）"
+    subject = f"ニュース{label} {now:%m/%d %H:%M}（新着{total}件）"
     return subject, "\n".join(lines) + "\n"
 
 
