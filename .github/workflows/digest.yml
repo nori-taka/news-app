@@ -1,18 +1,20 @@
 name: 朝夕のニュースメール
 
 # 新聞・通信の新着を、朝7時・昼12時・夕18時ごろ（日本時間）にメールで送る。
-# GitHub の定時実行は少し遅れて始まるので、10分前に起動する。
+# GitHub の定時実行は30〜45分遅れて始まり、まれに丸ごと飛ばされる（2026-10-29 に朝の分が飛んだ）。
+# そのため、起動は目標の約40分前に置き、記事は「前回の成功実行以降」を全部載せる。
 # 公共情報アプリ（7:35・16:35）とはずらしてある。
 # 手動実行（Actionsタブの「Run workflow」）でも送れる。
 on:
   schedule:
-    - cron: "50 21 * * *"  # 日本時間 6:50 → 7時ごろ着
-    - cron: "50 2 * * *"   # 日本時間 11:50 → 12時ごろ着
-    - cron: "50 8 * * *"   # 日本時間 17:50 → 18時ごろ着
+    - cron: "20 21 * * *"  # 日本時間 6:20 → 7時ごろ着
+    - cron: "20 2 * * *"   # 日本時間 11:20 → 12時ごろ着
+    - cron: "20 8 * * *"   # 日本時間 17:20 → 18時ごろ着
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   send:
@@ -22,6 +24,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: 前回の成功実行の時刻を調べる
+        id: last
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          t=$(gh api "repos/${{ github.repository }}/actions/workflows/digest.yml/runs?status=success&per_page=5" \
+            --jq '[.workflow_runs[] | select(.id != ${{ github.run_id }})][0].created_at // ""') || t=""
+          echo "前回の成功実行: ${t:-（なし）}"
+          echo "at=$t" >> "$GITHUB_OUTPUT"
       - name: 各社のRSSを取得
         run: python fetch_feeds.py
       - name: メールを送る
@@ -29,4 +40,5 @@ jobs:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+          LAST_SENT_AT: ${{ steps.last.outputs.at }}
         run: python send_digest.py

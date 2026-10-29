@@ -46,15 +46,22 @@ def norm_link(link):
     return link
 
 
-def build(feeds, now):
-    # 朝7時／昼12時／夕18時ごろに届く。前回のメール以降（13・5・6時間）に少し余裕を持たせる
+MAX_LOOKBACK = timedelta(hours=36)
+
+
+def build(feeds, now, last_sent=None):
+    """last_sent: 前回メールを送れた時刻。あればそれ以降の新着を全部載せる（定時実行が飛ばされた日の取りこぼし防止）。
+    なければ（初回・取得失敗）時刻ごとの固定の幅にする。"""
     if now.hour < 10:
         label, hours = "朝刊", 15
     elif now.hour < 15:
         label, hours = "昼刊", 7
     else:
         label, hours = "夕刊", 8
-    since = now - timedelta(hours=hours)
+    if last_sent is not None:
+        since = max(last_sent - timedelta(minutes=5), now - MAX_LOOKBACK)
+    else:
+        since = now - timedelta(hours=hours)
 
     by_company = {name: {} for _, name in COMPANIES}  # name -> {link: (dt, title)}
     for a in feeds["articles"]:
@@ -73,7 +80,7 @@ def build(feeds, now):
             failed.append(name)
 
     total = sum(len(v) for v in by_company.values())
-    lines = []
+    lines = [f"対象: {since:%m/%d %H:%M} 以降の新着", ""]
     for _, name in COMPANIES:
         items = sorted(by_company[name].items(), key=lambda kv: kv[1][0] or datetime.min.replace(tzinfo=JST), reverse=True)
         if name in failed and not items:
@@ -101,7 +108,12 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
 
     feeds = json.loads(FEEDS.read_text(encoding="utf-8"))
-    subject, body = build(feeds, datetime.now(JST))
+    last = os.environ.get("LAST_SENT_AT", "").strip()  # ワークフローが前回の成功実行の時刻（UTC）を渡す
+    try:
+        last_sent = datetime.fromisoformat(last.replace("Z", "+00:00")).astimezone(JST) if last else None
+    except ValueError:
+        last_sent = None
+    subject, body = build(feeds, datetime.now(JST), last_sent)
     if a.dry_run:
         print("件名:", subject, "\n")
         print(body)
